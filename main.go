@@ -1,45 +1,63 @@
 package main
 
 import (
-	"os"
-	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/pelletier/go-toml"
+	"golang.org/x/net/context"
 	"googlemaps.github.io/maps"
 	"log"
-	"golang.org/x/net/context"
-	"github.com/kr/pretty"
-	"errors"
+	"net/http"
+	"os"
+	"io/ioutil"
 )
+
+type configFile struct {
+	google googleConfig
+}
+
+type googleConfig struct {
+	key string
+}
 
 func main() {
 
-	fmt.Println( "Welcome to Atlas! " )
-
-	params := os.Args
-
-	if len(os.Args) < 3 {
-		err := errors.New( "Insufficient number of arguments: you need to specify an address and an API key!")
-		log.Fatal( err )
-	}
-
-	address := params[1]
-	apiKey  := params[2]
-
-	fmt.Printf("Fetching coordinates for '%s' using '%s' for authentication...\n", address, apiKey)
-
-	client, err := maps.NewClient(maps.WithAPIKey(apiKey))
+	configFileName    := os.Getenv("HOME") + "/atlas.toml"
+	fileContents, err := ioutil.ReadFile(configFileName)
 
 	if err != nil {
 		log.Fatalf("Fatal error: %s", err)
 	}
 
-	request := &maps.GeocodingRequest{Address:address}
-
-	response, err := client.Geocode( context.Background(), request )
+	config, err := toml.Load(string(fileContents))
 
 	if err != nil {
-		log.Fatalf("Fatal error: %s", err)
+		log.Fatalf("Fatal error, could not load %s configuration file: %s\n", configFileName, err.Error())
 	}
 
-	pretty.Println( response )
+	key := config.Get("google.key").(string)
+
+	client, err := maps.NewClient(maps.WithAPIKey(key))
+
+	if err != nil {
+		log.Fatalf("Fatal error, could not connect to Google Maps API: %s", err)
+	}
+
+	router := gin.Default()
+
+	// The request responds to a url matching: /geocode?address=London
+	router.GET("/geocode", func(c *gin.Context) {
+
+		address := c.Query("address")
+		request := &maps.GeocodingRequest{Address:address}
+
+		response, err := client.Geocode( context.Background(), request )
+
+		if err != nil {
+			log.Fatalf("Fatal error: %s", err)
+		}
+
+		c.JSON(http.StatusOK, response )
+	})
+
+	router.Run(":8080")
 }
-

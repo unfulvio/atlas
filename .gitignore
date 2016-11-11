@@ -1,1 +1,5 @@
+# IDE
 .idea
+
+# Config files
+config.toml
