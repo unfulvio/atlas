@@ -11,14 +11,6 @@ import (
 	"io/ioutil"
 )
 
-type configFile struct {
-	google googleConfig
-}
-
-type googleConfig struct {
-	key string
-}
-
 func main() {
 
 	configFileName    := os.Getenv("HOME") + "/atlas.toml"
